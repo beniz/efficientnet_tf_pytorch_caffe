@@ -3,18 +3,52 @@ import sys
 import logging
 logging.basicConfig(level = logging.INFO)
 
+data_layer = '''layer {
+  name: "data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  include {
+    phase: TRAIN
+  }
+  transform_param {
+    mirror: true
+    mean_file: "mean.binaryproto"
+  }
+  data_param {
+    source: "train.lmdb"
+    batch_size: 32
+    backend: LMDB
+  }
+}
+layer {
+  name: "efficientnet"
+  type: "MemoryData"
+  top: "data"
+  top: "label"
+  include {
+    phase: TEST
+  }
+  memory_data_param {
+    batch_size: 1
+    channels: 3
+    height: 224
+    width: 224
+  }
+}\n'''
+
 def data(txt_file, info):
   txt_file.write('name: "efficientnet_pytorch2caffe"\n')
-  txt_file.write('layer {\n')
-  txt_file.write('  name: "data"\n')
-  txt_file.write('  type: "Input"\n')
-  txt_file.write('  top: "data"\n')
-  txt_file.write('  input_param {\n')
-  #txt_file.write('    shape: { dim: 10 dim: 3 dim: 224 dim: 224 }\n') # TODO
-  txt_file.write('    shape: { dim: 1 dim: 3 dim: 224 dim: 224 }\n') # TODO
-  txt_file.write('  }\n')
-  txt_file.write('}\n')
-  txt_file.write('\n')
+#  txt_file.write('layer {\n')
+#  txt_file.write('  name: "data"\n')
+#  txt_file.write('  type: "Input"\n')
+#  txt_file.write('  top: "data"\n')
+#  txt_file.write('  input_param {\n')
+#  txt_file.write('    shape: { dim: 1 dim: 3 dim: 224 dim: 224 }\n') # TODO
+#  txt_file.write('  }\n')
+#  txt_file.write('}\n')
+#  txt_file.write('\n')
+  txt_file.write(data_layer)
 
 def SliceChannel(txt_file, info):
   txt_file.write('layer {\n')
@@ -48,7 +82,7 @@ def DropOut(txt_file, info):
   txt_file.write('}\n')
   txt_file.write('\n')
 
-def Convolution(txt_file, info):
+def Convolution(txt_file, info, dw=False):
   if info['attrs']['no_bias'] == 'True':
     bias_term = 'false'
   else:
@@ -57,7 +91,10 @@ def Convolution(txt_file, info):
   txt_file.write('  bottom: "%s"\n'       % info['bottom'][0])
   txt_file.write('  top: "%s"\n'          % info['top'])
   txt_file.write('  name: "%s"\n'         % info['top'])
-  txt_file.write('  type: "Convolution"\n')
+  if not dw:
+    txt_file.write('  type: "Convolution"\n')
+  else:
+    txt_file.write('  type: "ConvolutionDepthwise"\n')
   txt_file.write('  convolution_param {\n')
   txt_file.write('    num_output: %s\n'   % info['attrs']['num_filter'])
   txt_file.write('    kernel_size: %s\n'  % info['attrs']['kernel'].split('(')[1].split(',')[0]) # TODO
@@ -73,6 +110,9 @@ def Convolution(txt_file, info):
 
   txt_file.write('    stride: %s\n'       % info['attrs']['stride'].split('(')[1].split(',')[0])
   txt_file.write('    bias_term: %s\n'    % bias_term)
+  if dw:
+    txt_file.write('  engine: CAFFE\n')
+  txt_file.write('   weight_filler {\n    type: "xavier"\n}\n')
   txt_file.write('  }\n')
 
   if 'share' in info.keys() and info['share']: 
@@ -93,7 +133,7 @@ def BatchNorm(txt_file, info):
   txt_file.write('  name: "%s"\n'         % info['top'])
   txt_file.write('  type: "BatchNorm"\n')
   txt_file.write('  batch_norm_param {\n')
-  txt_file.write('    use_global_stats: true\n')        # TODO
+  txt_file.write('    use_global_stats: false\n')
   #txt_file.write('    moving_average_fraction: 0.9\n')  # TODO
   txt_file.write('    eps: %s\n'          %info['attrs']["eps"])# TODO
 
@@ -285,9 +325,20 @@ def Flatten(txt_file, info):
 def SoftmaxOutput(txt_file, info):
   txt_file.write('layer {\n')
   txt_file.write('  bottom: "%s"\n'     % info['bottom'][0])
-  txt_file.write('  top: "%s"\n'        % info['top'])
+  txt_file.write('  top: "%st"\n'        % info['top']) ##TODO: probt
   txt_file.write('  name: "%s"\n'       % info['top'])
   txt_file.write('  type: "Softmax"\n')
+  txt_file.write('  include {\n phase: TEST\n }\n')
+  txt_file.write('}\n')
+  txt_file.write('\n')
+
+def SoftmaxLoss(txt_file, info):
+  txt_file.write('layer {\n')
+  txt_file.write('  bottom: "%s"\n'     % info['bottom'][0])
+  txt_file.write('  bottom: "%s"\n'     % info['bottom'][1])
+  txt_file.write('  top: "%s"\n'        % info['top'])
+  txt_file.write('  name: "%s"\n'       % info['top'])
+  txt_file.write('  type: "SoftmaxWithLoss"\n')
   txt_file.write('}\n')
   txt_file.write('\n')
 

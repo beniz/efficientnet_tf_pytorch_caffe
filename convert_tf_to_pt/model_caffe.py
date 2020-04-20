@@ -32,7 +32,7 @@ def caffe_global_avg_pool(ofs,top,bottom):
   attr["attrs"]["global_pool"] = "True"
   Pooling_global(ofs,attr)
 
-def caffe_convolution(ofs,top,bottom,num_filter,kernel = 1,pad = 0,stride=1,bias=False,group = 1):
+def caffe_convolution(ofs,top,bottom,num_filter,kernel = 1,pad = 0,stride=1,bias=False,group = 1,dw=False):
   attr = {}
   attr["top"] = top
   attr["bottom"] = [bottom]
@@ -43,7 +43,7 @@ def caffe_convolution(ofs,top,bottom,num_filter,kernel = 1,pad = 0,stride=1,bias
   attr["attrs"]["stride"] = "(" + str(stride) + ",)"
   attr["attrs"]["num_group"] = str(group)
   attr["attrs"]["no_bias"] = str(not bias)
-  Convolution(ofs,attr)
+  Convolution(ofs,attr,dw)
 
 def caffe_BroadcastMul(ofs,top,bottom):
   attr = {}
@@ -79,6 +79,13 @@ def caffe_flatten(ofs,top,bottom):
   attr["bottom"] = [bottom]
   Flatten(ofs,attr)
 
+def caffe_softmax(ofs,top,bottom):
+  attr = {}
+  attr["top"] = top
+  attr["bottom"] = bottom
+  SoftmaxLoss(ofs,attr)
+  SoftmaxOutput(ofs,attr)
+  
 class MBConvBlock(nn.Module):
     """
     Mobile Inverted Residual Bottleneck Block
@@ -126,7 +133,7 @@ class MBConvBlock(nn.Module):
         else:
             bottom = caffe_attr[0] + "._swish0"
 
-        caffe_convolution(caffe_attr[2],caffe_attr[0] + "._depthwise_conv",bottom,oup,k,pad = k/2,stride = s[0],group = oup)
+        caffe_convolution(caffe_attr[2],caffe_attr[0] + "._depthwise_conv",bottom,oup,k,pad = k/2,stride = s[0],group = oup,dw=True)
         self._depthwise_conv = getConv2d(in_size = insize,in_channels=oup,out_size = outsize,out_channels=oup,groups=oup,kernel_size=k, stride=s[0], bias=False)
         caffe_normalization(caffe_attr[2],caffe_attr[0] + "._bn1",caffe_attr[0] + "._depthwise_conv",self._bn_eps)
         self._bn1 = nn.BatchNorm2d(num_features=oup, momentum=self._bn_mom, eps=self._bn_eps)
@@ -155,9 +162,9 @@ class MBConvBlock(nn.Module):
         # Output phase
         final_oup = self._block_args.output_filters
         if self.has_se:
-		    bottom = caffe_attr[0] + "._broadcast_mul"
+          bottom = caffe_attr[0] + "._broadcast_mul"
         else:
-            bottom = caffe_attr[0] + "._swish1"
+          bottom = caffe_attr[0] + "._swish1"
 
         caffe_convolution(caffe_attr[2],caffe_attr[0] + "._project_conv",bottom,final_oup)
         self._project_conv = getConv2d(in_size = outsize,in_channels=oup,out_size = outsize,out_channels=final_oup, kernel_size=1, bias = False)
@@ -301,6 +308,7 @@ class EfficientNet(nn.Module):
             self._dropout = torch.nn.Dropout2d(self._dropout)
         caffe_flatten(file,"_flatten","_dropout")
         caffe_fc(file,"_fc","_flatten",self._global_params.num_classes)
+        caffe_softmax(file,"_loss",["_fc","label"])
         self._fc = nn.Linear(out_channels, self._global_params.num_classes)
         file.close()
 

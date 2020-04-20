@@ -2,6 +2,7 @@ from __future__ import print_function
 import json
 import torch
 import numpy as np
+import sys
 from PIL import Image
 from model import *
 from torchvision import transforms
@@ -22,7 +23,7 @@ model.eval()
 with torch.no_grad():
   outputs = model(img)
 
-print(outputs.reshape(-1).astype(np.float32))
+print(outputs.reshape(-1))#.astype(np.float32))
 print(outputs.shape)
 #print(type(outputs.numpy()))
 

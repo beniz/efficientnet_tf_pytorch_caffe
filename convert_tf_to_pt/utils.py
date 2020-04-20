@@ -6,6 +6,7 @@ import re
 import math
 import collections
 import torch
+import os
 from torch import nn
 from torch.nn import functional as F
 from torch.utils import model_zoo
@@ -202,8 +203,12 @@ def efficientnet(width_coefficient=None, depth_coefficient=None,
 
 def get_model_params(model_name, override_params):
     """ Get the block args and global params for a given model """
-    if model_name.startswith('efficientnet'):
-        w, d, _, p = efficientnet_params(model_name)
+    print('model_name=',model_name)
+    #if model_name.startswith('efficientnet'):
+    if 'efficientnet' in model_name:
+        print('ok')
+        model_fname = os.path.basename(model_name).replace('.pth','')
+        w, d, _, p = efficientnet_params(model_fname)
         # note: all models have drop connect rate = 0.2
         blocks_args, global_params = efficientnet(width_coefficient=w, depth_coefficient=d, dropout_rate=p)
     else:
@@ -225,6 +230,7 @@ url_map = {
 
 def load_pretrained_weights(model, model_name):
     """ Loads pretrained weights, and downloads if loading for the first time. """
-    state_dict = torch.load("../pretrained_pytorch/" + model_name + ".pth")#model_zoo.load_url(url_map[model_name])
+    #state_dict = torch.load("../pretrained_pytorch/" + model_name + ".pth")#model_zoo.load_url(url_map[model_name])
+    state_dict = torch.load(model_name)
     model.load_state_dict(state_dict)
     print('Loaded pretrained weights for {}'.format(model_name))

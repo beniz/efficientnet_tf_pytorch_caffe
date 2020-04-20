@@ -11,12 +11,13 @@ if not len(sys.argv) == 2:
 model_name = sys.argv[1]
 
 dict = torch.load("../pretrained_pytorch/" + model_name + ".pth")
+caffe.set_mode_cpu()
 model = caffe.Net("caffemodel/" + model_name + ".prototxt",caffe.TEST)
 
 for kv in model.params:
-  print kv
+  print(kv)
 for k,v in dict.items():
-  print k,v.numpy().shape
+  print(k,v.numpy().shape)
 
 for k,v in dict.items():
   #batch normalization

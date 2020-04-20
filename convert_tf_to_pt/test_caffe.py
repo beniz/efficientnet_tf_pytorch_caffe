@@ -20,5 +20,5 @@ model = caffe.Net(deploy,caffemodel,caffe.TEST)
 model.blobs['data'].data[...] = img
 out = model.forward()
 prob= model.blobs["_fc"].data
-print prob.reshape(-1)
-print img.shape
+print(prob.reshape(-1))
+print(img.shape)
